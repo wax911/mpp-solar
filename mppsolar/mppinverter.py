@@ -45,11 +45,34 @@ def getDataValue(data, key):
         return ""
 
 
-def getCommandsFromJson():
+def isInverterSupported(inverter_model, json):
+    """
+    Determine if the command loaded from json supports the supplied inverter
+    """
+    supports = getDataValue(json, 'supports')
+    nosupports = getDataValue(json, 'nosupports')
+    log.debug("-----No supports {}".format(nosupports))
+    # Some commands are specifically not supported by some models
+    if inverter_model in nosupports:
+        log.debug("Command {} not supported on inverter {}".format(getDataValue(json, 'name'), inverter_model))
+        return False
+    # JSON command support all inverters unless specified
+    if supports == "":
+        log.debug("Command {} supported all inverters".format(getDataValue(json, 'name')))
+        return True
+    elif inverter_model in supports:
+        log.debug("Command {} supported by model {}".format(getDataValue(json, 'name'), inverter_model))
+        return True
+    else:
+        return False
+
+
+def getCommandsFromJson(inverter_model):
     """
     Read in all the json files in the commands subdirectory
     this builds a list of all valid commands
     """
+    log.info("Loading commands for inverter model: {}".format(inverter_model))
     COMMANDS = []
     here = path.abspath(path.dirname(__file__))
     files = glob.glob(here + '/commands/*.json')
@@ -59,12 +82,15 @@ def getCommandsFromJson():
             try:
                 data = json.load(f)
             except Exception:
-                log.debug("Error processing JSON in {}".format(file), exc_info=True)
+                log.debug("Error processing JSON in {}".format(file))
                 continue
-            COMMANDS.append(mppCommand(getDataValue(data, 'name'), getDataValue(data, 'description'),
-                                       getDataValue(data, 'type'), getDataValue(data, 'response'),
-                                       getDataValue(data, 'test_responses'), getDataValue(data, 'regex'),
-                                       help=getDataValue(data, 'help')))
+            # Does this json support the supplied inverter model?
+            if isInverterSupported(inverter_model, data):
+                log.info("... command {} loaded for inverter model: {}".format(getDataValue(data, 'name'), inverter_model))
+                COMMANDS.append(mppCommand(getDataValue(data, 'name'), getDataValue(data, 'description'),
+                                           getDataValue(data, 'type'), getDataValue(data, 'response'),
+                                           getDataValue(data, 'test_responses'), getDataValue(data, 'regex'),
+                                           help=getDataValue(data, 'help')))
     return COMMANDS
 
 
@@ -97,15 +123,16 @@ class mppInverter:
     - represents an inverter (and the commands the inverter supports)
     """
 
-    def __init__(self, serial_device=None, baud_rate=2400):
+    def __init__(self, serial_device=None, baud_rate=2400, inverter_model='standard'):
         if not serial_device:
             raise NoDeviceError("A device to communicate by must be supplied, e.g. /dev/ttyUSB0")
         self._baud_rate = baud_rate
         self._serial_device = serial_device
+        self._inverter_model = inverter_model
         self._serial_number = None
         self._test_device = isTestDevice(serial_device)
         self._direct_usb = isDirectUsbDevice(serial_device)
-        self._commands = getCommandsFromJson()
+        self._commands = getCommandsFromJson(inverter_model)
         # TODO: text descrption of inverter? version numbers?
 
     def __str__(self):
@@ -126,9 +153,11 @@ class mppInverter:
 
     def getSerialNumber(self):
         if self._serial_number is None:
-            response = self.execute("QID").getResponseDict()
-            if response:
-                self._serial_number = response["serial_number"][0]
+            result = self.execute("QID")
+            if not result:
+                response = result.getResponseDict()
+                if response:
+                    self._serial_number = response["serial_number"][0]
         return self._serial_number
 
     def getAllCommands(self):
@@ -136,6 +165,46 @@ class mppInverter:
         Return list of defined commands
         """
         return self._commands
+
+    def getResponse(self, cmd):
+        """
+        Execute command and return the response
+        """
+        result = self.execute(cmd)
+        if not result:
+            return ""
+        else:
+            return result.getResponse()
+
+    def getInfluxLineProtocol2(self, cmd):
+        """
+        Execute command and return the reponse as a Influx Line Protocol messages
+        """
+        result = self.execute(cmd)
+        if not result:
+            return ""
+        else:
+            return result.getInfluxLineProtocol2()
+
+    def getInfluxLineProtocol(self, cmd):
+        """
+        Execute command and return the reponse as a Influx Line Protocol messages
+        """
+        result = self.execute(cmd)
+        if not result:
+            return ""
+        else:
+            return result.getInfluxLineProtocol()
+
+    def getResponseDict(self, cmd):
+        """
+        Execute command and return the reponse as a dict
+        """
+        result = self.execute(cmd)
+        if not result:
+            return ""
+        else:
+            return result.getResponseDict()
 
     def _getCommand(self, cmd):
         """
@@ -152,7 +221,7 @@ class mppInverter:
             else:
                 match = command.regex.match(cmd)
                 if match:
-                    log.debug(command.name, command.regex)
+                    # log.debug(command.name, command.regex)
                     log.debug("Matched: {} Value: {}".format(command.name, match.group(1)))
                     command.setValue(match.group(1))
                     return command
@@ -191,7 +260,7 @@ class mppInverter:
                     command.setResponse(response_line)
                     return command
         except Exception as e:
-            log.debug('Serial read error', e.strerror)
+            log.warning("Serial read error: {}".format(e))
         log.info('Command execution failed')
         return command
 
@@ -206,7 +275,7 @@ class mppInverter:
         try:
             usb0 = os.open(self._serial_device, os.O_RDWR | os.O_NONBLOCK)
         except Exception as e:
-            log.debug('USB open error', e.strerror)
+            log.debug("USB open error: {}".format(e))
             return command
         # Send the command to the open usb connection
         to_send = command.full_command
@@ -225,7 +294,7 @@ class mppInverter:
                 r = os.read(usb0, 256)
                 response_line += r
             except Exception as e:
-                log.debug('USB read error', e.strerror)
+                log.debug("USB read error: {}".format(e))
             # Finished is \r is in response
             if ('\r' in response_line):
                 # remove anything after the \r
@@ -244,11 +313,11 @@ class mppInverter:
             log.critical("Command not found")
             return None
         elif (self._test_device):
-            log.debug('TEST connection: executing %s', command)
+            log.info('TEST connection: executing %s', command)
             return self._doTestCommand(command)
         elif (self._direct_usb):
-            log.debug('DIRECT USB connection: executing %s', command)
+            log.info('DIRECT USB connection: executing %s', command)
             return self._doDirectUsbCommand(command)
         else:
-            log.debug('SERIAL connection: executing %s', command)
+            log.info('SERIAL connection: executing %s', command)
             return self._doSerialCommand(command)
