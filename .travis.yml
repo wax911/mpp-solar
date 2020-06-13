@@ -1,7 +1,6 @@
 language: python
 sudo: true
 python:
-    - "2.7"
     - "3.6"
     - "3.8"
 
@@ -9,13 +8,14 @@ install:
   - "pip install python-coveralls"
   - "pip install coverage"
   - "pip install flake8"
-  - "python ./setup.py install"
+  - "sudo python ./setup.py install"
 
 before_script:
   - "flake8 setup.py mppsolar tests"
 
 script:
-  - "coverage run ./setup.py test"
+  - "coverage_exe=`which coverage`"
+  - "sudo $coverage_exe run ./setup.py test"
 
 after_success:
   - "coverage report"

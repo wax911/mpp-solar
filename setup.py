@@ -15,7 +15,7 @@ from os import path
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+with open(path.join(here, 'pypi_README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 exec(open(path.join(here, 'mppsolar/version.py')).read())
@@ -30,6 +30,7 @@ setup(
 
     description='Package to communicate with MPP Solar PIP-4048MS inverter',
     long_description=long_description,
+    long_description_content_type='text/markdown',
 
     # The project's main homepage.
     url='https://github.com/jblance/mpp-solar',
@@ -57,8 +58,6 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.8',

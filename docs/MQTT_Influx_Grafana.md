@@ -1,5 +1,8 @@
 # MPP Solar Inverter - Connecting to local MQTT / Influx / Grafana #
 
+Connecting to Grafana, as documented below uses a number of components / steps.
+![mpp-solar to Grafana components](mpp-solar.png)
+
 ## Setting up a MQTT Broker on the Raspberry Pi ##
 Note: while the below shows setting up the MQTT broker on the same device as is connected to the inverter, this is not needed, as long as the inverter connected Pi can communication with the MQTT broker the broker can be anywhere (including on the Inter-tubes). Just change the `-h localhost`. Password secured brokers are not currently supported
 
@@ -37,6 +40,8 @@ and add a line like
 ```
 which will run the QPIGS command every minute and log errors to /home/pi/cron.out
 
+or use the mpp-solar service [as detailed here](../daemon/README.md)
+
 ## Install Influx ##
 Source: https://simonhearne.com/2020/pi-influx-grafana/
 Thanks SIMON HEARNE!!
@@ -64,11 +69,11 @@ influx
 ```
 * add users etc
 ```
-create database home
-use home
+create database mppsolar
+use mppsolar
 
 create user grafana with password '<passwordhere>' with all privileges
-grant all privileges on home to grafana
+grant all privileges on mppsolar to grafana
 
 show users
 ```
@@ -107,6 +112,7 @@ sudo systemctl enable grafana
 ## Configure Telegraf ##
 
 * Configure Telegraf
+* Edit `/etc/telegraf/telegraf.conf`, find the line with `[[outputs.influxdb]]` and put a `#` at the start (i.e. comment out that line)
 * In an new file `/etc/telegraf/telegraf.d/mqtt-input.conf` add these lines:
 ```
 [[inputs.mqtt_consumer]]
@@ -120,7 +126,7 @@ sudo systemctl enable grafana
 ```
 [[outputs.influxdb]]
   urls = ["http://127.0.0.1:8086"]
-  database = "home"
+  database = "mppsolar"
   skip_database_creation = true
   username = "grafana"
   password = "<put your password here>"
@@ -146,10 +152,11 @@ If you get an error `ImportError: No module named paho.mqtt.publish`
 
 To check what is stored in influx
 * log in to influx `influx`
-* at influx prompt use the DB created `use home`
+* at influx prompt use the DB created `use mppsolar`
 * show all the 'tables' `show measurements`
 * show entries in one table `select * from <table name goes here>` e.g. `select * from QPGS0`
 
 * Show telegraf errors `sudo systemctl status telegraf`
 
-* Show cron errors `cat /home/pi/cron.out`
+* Show cron errors (if using cron and not the service)`cat /home/pi/cron.out`
+* Show mpp-solar service errors `systemctl --user status mpp-solar`

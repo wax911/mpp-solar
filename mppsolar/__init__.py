@@ -1,4 +1,4 @@
-# !/usr/bin/python
+# !/usr/bin/python3
 import logging
 from argparse import ArgumentParser
 
@@ -21,7 +21,7 @@ logging.basicConfig()
 
 
 def main():
-    parser = ArgumentParser(description='MPP Solar Command Utility')
+    parser = ArgumentParser(description='MPP Solar Command Utility, version: {}'.format(__version__))
     parser.add_argument('-c', '--command', help='Command to run', default='QID')
     parser.add_argument('-D', '--enableDebug', action='store_true', help='Enable Debug and above (i.e. all) messages')
     parser.add_argument('-I', '--enableInfo', action='store_true', help='Enable Info and above level messages')
@@ -51,10 +51,12 @@ def main():
 
     if(args.printcrc):
         # print("{0:#x}".format(100))
-        [crca, crcb] = mppcommand.crc(args.command)  # noqa: F821
-        [crc2a, crc2b] = mppcommand.crc2(args.command)  # noqa: F821
-        print("{0} {1:#x} {2:#x}".format(args.command, crca, crcb))
-        print("{0} {1:#x} {2:#x}".format(args.command, crc2a, crc2b))
+        _command = mp.getFullCommand(args.command)
+        if _command:
+            print('{}'.format(_command.byte_command))
+        else:
+            [crca, crcb] = mppcommand.crc(args.command)  # noqa: F821
+            print("{0} {1:#x} {2:#x}".format(args.command, crca, crcb))
     elif(args.listknown):
         for line in mp.getKnownCommands():
             print(line)
