@@ -142,12 +142,14 @@ class mppCommand(object):
         return self.byte_response
 
     def getResponse(self):
-        result = ''
+        result = []
         try:
             if self.protocol == 'PI18':
+                log.debug('getResponse with protocol = PI18')
                 result = self.byte_response[5:-3].decode('utf-8')
                 result = result.split(',')
             else:
+                log.debug('getResponse with protocol not PI18')
                 result = self.byte_response[1:-3].decode('utf-8')
                 result = result.split(' ')
         except:  # noqa: E722
@@ -215,9 +217,9 @@ class mppCommand(object):
             log.debug('Response invalid as no RESPONSE defined for %s', self.name)
             return False
         # Omit the CRC checksum and convert back to a string
-        response = resp.decode()
+        # response = resp.decode()
         # Check we got the expected number of responses
-        responses = response.split(" ")
+        responses = self.getResponse()
         if (len(responses) < len(self.response_definition)):
             log.debug("Response invalid as insufficient number of elements in byte_response. Got %d, expected as least %d", len(responses), len(self.response_definition))
             return False
