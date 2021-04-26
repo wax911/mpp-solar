@@ -1,10 +1,11 @@
 # MPP Solar Inverter - Connecting to local MQTT / Influx / Grafana #
 
 Connecting to Grafana, as documented below uses a number of components / steps.
-![mpp-solar to Grafana components](mpp-solar.png)
+![mpp-solar to Grafana components](images/mpp-solar.png)
 
 ## Setting up a MQTT Broker on the Raspberry Pi ##
-Note: while the below shows setting up the MQTT broker on the same device as is connected to the inverter, this is not needed, as long as the inverter connected Pi can communication with the MQTT broker the broker can be anywhere (including on the Inter-tubes). Just change the `-h localhost`. Password secured brokers are not currently supported
+Note: while the below shows setting up the MQTT broker on the same device as is connected to the inverter, this is not needed, as long as the inverter connected Pi can communication with the MQTT broker the broker can be anywhere (including on the Inter-tubes). Just change the `-q localhost`.
+Password secured brokers will need username and password supplied ` --mqttuser <username> --mqttpass <password>`
 
 * Install Mosquitto `sudo apt install -y mosquitto mosquitto-clients`
 * Set MQTT service to start on boot `sudo systemctl enable mosquitto.service`
@@ -21,7 +22,7 @@ basetopic/subtopic this is the message
 ```
 * If the message displayed in CMD1 window the test has passed. yay!
 
-* Test from mpp-solar, in CMD2 `mpp-info-pub -q localhost -c QID`
+* Test from mpp-solar, in CMD2 `mpp-solar -q localhost -c QID`
 * This should display something in CMD1 similar to (the numbers will be different and should match your inverter serial number):
 ```
 QID/serial_number/value 9293333010501
@@ -36,11 +37,11 @@ e.g. for cron
 `crontab -e` to edit
 and add a line like
 ```
-* * * * * /usr/local/bin/mpp-info-pub -q localhost -c QPIGS -i > /home/pi/cron.out 2>&1
+* * * * * /usr/local/bin/mpp-solar -q localhost -c QPIGS -i > /home/pi/cron.out 2>&1
 ```
 which will run the QPIGS command every minute and log errors to /home/pi/cron.out
 
-or use the mpp-solar service [as detailed here](../daemon/README.md)
+or [setup](service-README.md) the mpp-solar service
 
 ## Install Influx ##
 Source: https://simonhearne.com/2020/pi-influx-grafana/
@@ -122,6 +123,9 @@ sudo systemctl enable grafana-server
   ]
   data_format = "influx"
 ```
+_note: the topic "#" will listen to all mqtt topics, you will likely want to be more specific_
+
+
 * In a new file `/etc/telegraf/telegraf.d/influx-output.conf` add these lines
 ```
 [[outputs.influxdb]]
